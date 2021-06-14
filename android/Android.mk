@@ -108,3 +108,54 @@ LOCAL_SHARED_LIBRARIES := libasound
 LOCAL_HEADER_LIBRARIES := alsa_utils_headers
 
 include $(BUILD_EXECUTABLE)
+
+# Build alsaloop command
+include $(CLEAR_VARS)
+
+LOCAL_CFLAGS := $(ALSA_UTILS_CFLAGS)
+
+LOCAL_SRC_FILES := \
+        alsaloop/alsaloop.c \
+        alsaloop/control.c \
+        alsaloop/pcmjob.c
+
+LOCAL_MODULE := alsa_loop
+LOCAL_SHARED_LIBRARIES := libasound
+LOCAL_HEADER_LIBRARIES := alsa_utils_headers
+
+include $(BUILD_EXECUTABLE)
+
+# Build alsamixer command
+include $(CLEAR_VARS)
+
+LOCAL_CFLAGS := -std=c11 $(ALSA_UTILS_CFLAGS) \
+	-DCURSESINC=\"ncurses.h\" -D_GNU_SOURCE
+
+LOCAL_SRC_FILES := $(addprefix alsamixer/,\
+	bindings.c \
+	card_select.c \
+	cli.c \
+	colors.c \
+	configparser.c \
+	curskey.c \
+	device_name.c \
+	die.c \
+	mainloop.c \
+	mem.c \
+	menu_widget.c \
+	mixer_clickable.c \
+	mixer_controls.c \
+	mixer_display.c \
+	mixer_widget.c \
+	proc_files.c \
+	textbox.c \
+	utils.c \
+	volume_mapping.c \
+	widget.c)
+
+LOCAL_MODULE := alsa_alsamixer
+LOCAL_SHARED_LIBRARIES := libasound libncurses
+LOCAL_STATIC_LIBRARIES := libmenu libpanel libform
+LOCAL_HEADER_LIBRARIES := alsa_utils_headers
+
+include $(BUILD_EXECUTABLE)
