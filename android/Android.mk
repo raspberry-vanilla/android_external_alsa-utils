@@ -67,6 +67,20 @@ LOCAL_HEADER_LIBRARIES := alsa_utils_headers
 
 include $(BUILD_EXECUTABLE)
 
+# Build arecord command
+include $(CLEAR_VARS)
+
+LOCAL_CFLAGS := $(ALSA_UTILS_CFLAGS)
+
+LOCAL_SRC_FILES := \
+	aplay/aplay.c
+
+LOCAL_MODULE := alsa_arecord
+LOCAL_SHARED_LIBRARIES := libasound
+LOCAL_HEADER_LIBRARIES := alsa_utils_headers
+
+include $(BUILD_EXECUTABLE)
+
 # Build alsactl command
 include $(CLEAR_VARS)
 
