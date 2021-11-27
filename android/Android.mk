@@ -48,6 +48,7 @@ LOCAL_SRC_FILES := \
 	amixer/volume_mapping.c
 
 LOCAL_MODULE := alsa_amixer
+LOCAL_PROPRIETARY_MODULE := true
 LOCAL_SHARED_LIBRARIES := libasound
 LOCAL_HEADER_LIBRARIES := alsa_utils_headers
 
@@ -62,6 +63,7 @@ LOCAL_SRC_FILES := \
 	aplay/aplay.c
 
 LOCAL_MODULE := alsa_aplay
+LOCAL_PROPRIETARY_MODULE := true
 LOCAL_SHARED_LIBRARIES := libasound
 LOCAL_HEADER_LIBRARIES := alsa_utils_headers
 
@@ -76,6 +78,7 @@ LOCAL_SRC_FILES := \
 	aplay/aplay.c
 
 LOCAL_MODULE := alsa_arecord
+LOCAL_PROPRIETARY_MODULE := true
 LOCAL_SHARED_LIBRARIES := libasound
 LOCAL_HEADER_LIBRARIES := alsa_utils_headers
 
@@ -103,6 +106,7 @@ LOCAL_SRC_FILES := $(addprefix alsactl/,\
 	utils.c)
 
 LOCAL_MODULE := alsa_ctl
+LOCAL_PROPRIETARY_MODULE := true
 LOCAL_SHARED_LIBRARIES := libasound
 LOCAL_HEADER_LIBRARIES := alsa_utils_headers
 
@@ -118,6 +122,7 @@ LOCAL_SRC_FILES := \
         alsaucm/usecase.c \
 
 LOCAL_MODULE := alsa_ucm
+LOCAL_PROPRIETARY_MODULE := true
 LOCAL_SHARED_LIBRARIES := libasound
 LOCAL_HEADER_LIBRARIES := alsa_utils_headers
 
@@ -134,6 +139,7 @@ LOCAL_SRC_FILES := \
         alsaloop/pcmjob.c
 
 LOCAL_MODULE := alsa_loop
+LOCAL_PROPRIETARY_MODULE := true
 LOCAL_SHARED_LIBRARIES := libasound
 LOCAL_HEADER_LIBRARIES := alsa_utils_headers
 
