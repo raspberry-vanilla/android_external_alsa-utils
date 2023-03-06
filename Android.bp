@@ -1,0 +1,104 @@
+//
+// Copyright (C) 2019-2021 The Android-x86 Open Source Project
+// Copyright (C) 2023 KonstaKANG
+//
+// Licensed under the GNU General Public License Version 2 or later.
+// You may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.gnu.org/licenses/gpl.html
+//
+
+cc_library_headers {
+    name: "alsa_utils_headers",
+    vendor: true,
+    export_include_dirs: [
+       "android",
+       "include",
+    ],
+}
+
+cc_defaults {
+    name: "alsa_utils_defaults",
+    vendor: true,
+    header_libs: ["alsa_utils_headers"],
+    shared_libs: ["libasound"],
+    cflags: [
+        "-Wno-absolute-value",
+        "-Wno-enum-conversion",
+        "-Wno-missing-field-initializers",
+        "-Wno-parentheses",
+        "-Wno-pointer-arith",
+        "-Wno-sign-compare",
+        "-Wno-unused-parameter",
+        "-Wno-unused-variable",
+    ],
+}
+
+cc_binary {
+    name: "alsa_amixer",
+    srcs: [
+	"amixer/amixer.c",
+	"amixer/volume_mapping.c",
+    ],
+    cflags: [
+        "-D_GNU_SOURCE",
+    ],
+    defaults: ["alsa_utils_defaults"],
+}
+
+cc_binary {
+    name: "alsa_aplay",
+    srcs: [
+        "aplay/aplay.c",
+    ],
+    defaults: ["alsa_utils_defaults"],
+}
+
+cc_binary {
+    name: "alsa_arecord",
+    srcs: [
+        "aplay/aplay.c",
+    ],
+    defaults: ["alsa_utils_defaults"],
+}
+
+cc_binary {
+    name: "alsa_ctl",
+    srcs: [
+	"alsactl/alsactl.c",
+	"alsactl/clean.c",
+	"alsactl/daemon.c",
+	"alsactl/init_parse.c",
+	"alsactl/init_ucm.c",
+	"alsactl/lock.c",
+	"alsactl/monitor.c",
+	"alsactl/state.c",
+	"alsactl/utils.c",
+    ],
+    cflags: [
+	"-DSYS_ASOUNDRC=\"/data/local/tmp/asound.state\"",
+	"-DSYS_LOCKFILE=\"/data/local/tmp/asound.state.lock\"",
+	"-DSYS_PIDFILE=\"/data/local/tmp/alsactl.pid\"",
+    ],
+    defaults: ["alsa_utils_defaults"],
+}
+
+cc_binary {
+    name: "alsa_ucm",
+    srcs: [
+        "alsaucm/dump.c",
+        "alsaucm/usecase.c",
+    ],
+    defaults: ["alsa_utils_defaults"],
+}
+
+cc_binary {
+    name: "alsa_loop",
+    srcs: [
+        "alsaloop/alsaloop.c",
+        "alsaloop/control.c",
+        "alsaloop/pcmjob.c",
+    ],
+    defaults: ["alsa_utils_defaults"],
+}

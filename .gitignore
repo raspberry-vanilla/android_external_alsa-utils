@@ -56,7 +56,6 @@ topology/alsatplg
 
 include/aconfig.h*
 include/stamp-*
-include/version.h
 po/Makefile*
 po/POTFILES
 po/Rules-quot
