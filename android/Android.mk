@@ -72,13 +72,15 @@ include $(CLEAR_VARS)
 
 LOCAL_CFLAGS := $(ALSA_UTILS_CFLAGS) \
 	-DSYS_ASOUNDRC=\"/data/local/tmp/asound.state\" \
-	-DSYS_LOCKFILE=\"/data/local/tmp/asound.state.lock\" \
+	-DSYS_LOCKPATH=\"/data/local/tmp/\" \
+	-DSYS_LOCKFILE=\"asound.state.lock\" \
 	-DSYS_PIDFILE=\"/data/local/tmp/alsactl.pid\"
 
 LOCAL_SRC_FILES := $(addprefix alsactl/,\
 	alsactl.c \
 	clean.c \
 	daemon.c \
+	info.c \
 	init_parse.c \
 	init_ucm.c \
 	lock.c \
