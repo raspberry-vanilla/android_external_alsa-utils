@@ -98,7 +98,7 @@ static int run_plugin(struct tplg_pre_processor *tplg_pp, char *plugin)
 	}
 
 	/* process plugin */
-	process(tplg_pp->input_cfg, tplg_pp->output_cfg);
+	ret = process(tplg_pp->input_cfg, tplg_pp->output_cfg);
 
 err:
 	if (h)
@@ -493,41 +493,50 @@ static int pre_process_include_conf(struct tplg_pre_processor *tplg_pp, snd_conf
 		if (snd_config_get_id(n, &id) < 0)
 			continue;
 
-		ret = regcomp(&regex, id, 0);
+		ret = regcomp(&regex, id, REG_EXTENDED | REG_ICASE);
 		if (ret) {
 			fprintf(stderr, "Could not compile regex\n");
 			goto err;
 		}
 
 		/* Execute regular expression */
-		ret = regexec(&regex, value, 0, NULL, REG_ICASE);
+		ret = regexec(&regex, value, 0, NULL, 0);
 		if (ret)
 			continue;
 
-		/* regex matched. now include the conf file */
-		ret = snd_config_get_string(n, &filename);
-		if (ret < 0)
-			goto err;
+		/* regex matched. now include or use the configuration */
+		if (snd_config_get_type(n) == SND_CONFIG_TYPE_COMPOUND) {
+			/* configuration block */
+			ret = snd_config_merge(*new, n, 0);
+			if (ret < 0) {
+				fprintf(stderr, "Unable to merge key '%s'\n", value);
+				goto err;
+			}
+		} else {
+			ret = snd_config_get_string(n, &filename);
+			if (ret < 0)
+				goto err;
 
-		if (filename && filename[0] != '/')
-			full_path = tplg_snprintf("%s/%s", tplg_pp->inc_path, filename);
-		else
-			full_path = tplg_snprintf("%s", filename);
+			if (filename && filename[0] != '/')
+				full_path = tplg_snprintf("%s/%s", tplg_pp->inc_path, filename);
+			else
+				full_path = tplg_snprintf("%s", filename);
 
-		ret = snd_input_stdio_open(&in, full_path, "r");
-		if (ret < 0) {
-			fprintf(stderr, "Unable to open included conf file %s\n", full_path);
+			ret = snd_input_stdio_open(&in, full_path, "r");
+			if (ret < 0) {
+				fprintf(stderr, "Unable to open included conf file %s\n", full_path);
+				free(full_path);
+				goto err;
+			}
 			free(full_path);
-			goto err;
-		}
-		free(full_path);
 
-		/* load config */
-		ret = snd_config_load(*new, in);
-		snd_input_close(in);
-		if (ret < 0) {
-			fprintf(stderr, "Unable to load included configuration\n");
-			goto err;
+			/* load config */
+			ret = snd_config_load(*new, in);
+			snd_input_close(in);
+			if (ret < 0) {
+				fprintf(stderr, "Unable to load included configuration\n");
+				goto err;
+			}
 		}
 
 		/* forcefully overwrite with defines from the command line */
@@ -538,7 +547,9 @@ static int pre_process_include_conf(struct tplg_pre_processor *tplg_pp, snd_conf
 		}
 
 		/* recursively process any nested includes */
-		return pre_process_includes(tplg_pp, *new);
+		ret = pre_process_includes(tplg_pp, *new);
+		if (ret < 0)
+			goto err;
 	}
 
 err:
@@ -689,7 +700,7 @@ int pre_process(struct tplg_pre_processor *tplg_pp, char *config, size_t config_
 	/* process topology plugins */
 	err = pre_process_plugins(tplg_pp);
 	if (err < 0) {
-		fprintf(stderr, "Unable to run pre-process plugins\n");
+		fprintf(stderr, "Unable to run pre-process plugins or plugins return error\n");
 		goto err;
 	}
 
