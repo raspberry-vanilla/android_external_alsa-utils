@@ -5,6 +5,7 @@
 // Author: Seppo Ingalsuo <seppo.ingalsuo@linux.intel.com>
 //         Jaska Uimonen <jaska.uimonen@linux.intel.com>
 
+#include "aconfig.h"
 #include <stdint.h>
 #include <errno.h>
 #include <stdio.h>
@@ -134,7 +135,7 @@ static void find_modes(struct intel_dmic_params *dmic, struct dmic_calc_decim_mo
 	int osr;
 	int mfir;
 	int mcic;
-	int ioclk_test;
+	unsigned int ioclk_test;
 	int osr_min = DMIC_MIN_OSR;
 	int j;
 	int i = 0;
@@ -146,7 +147,6 @@ static void find_modes(struct intel_dmic_params *dmic, struct dmic_calc_decim_mo
 	 * num_of_modes as zero.
 	 */
 	if (fs == 0) {
-		fprintf(stderr, "find_modes(): fs not set\n");
 		return;
 	}
 
@@ -328,7 +328,7 @@ static struct pdm_decim *get_fir(struct intel_dmic_params *dmic,
 	 * sets HW overrun status and overwrite of other register.
 	 */
 	fir_max_length = MIN(DMIC_HW_FIR_LENGTH_MAX,
-			     dmic->dmic_prm[di].io_clk / fs / 2 -
+			     (int)dmic->dmic_prm[di].io_clk / fs / 2 -
 			     DMIC_FIR_PIPELINE_OVERHEAD);
 
 	/* Loop until NULL */
@@ -662,7 +662,7 @@ static int configure_registers(struct intel_dmic_params *dmic, struct dmic_calc_
 	int soft_reset;
 	int cic_mute;
 	int fir_mute;
-	int i;
+	unsigned int i;
 	int j;
 	int ret;
 	int mic;
@@ -830,8 +830,11 @@ static int configure_registers(struct intel_dmic_params *dmic, struct dmic_calc_
 			CIC_CONTROL_CIC_START_A(1) |
 			CIC_CONTROL_MIC_B_POLARITY(dmic->dmic_prm[di].pdm[i].polarity_mic_b) |
 			CIC_CONTROL_MIC_A_POLARITY(dmic->dmic_prm[di].pdm[i].polarity_mic_a) |
-			CIC_CONTROL_MIC_MUTE(cic_mute) |
-			CIC_CONTROL_STEREO_MODE(stereo[i]);
+			CIC_CONTROL_MIC_MUTE(cic_mute);
+
+		if (dmic->dmic_prm[di].driver_version == 1)
+			val |= CIC_CONTROL_STEREO_MODE(stereo[i]);
+
 		dmic->dmic_blob_pdm[i].cic_control = val;
 
 		val = CIC_CONFIG_CIC_SHIFT(cfg->cic_shift + 8) |

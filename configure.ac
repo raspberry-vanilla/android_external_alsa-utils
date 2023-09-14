@@ -1,6 +1,6 @@
 dnl Process this file with autoconf to produce a configure script.
 AC_PREREQ(2.59)
-AC_INIT(alsa-utils, 1.2.9)
+AC_INIT(alsa-utils, 1.2.10)
 AC_CONFIG_SRCDIR([aplay/aplay.c])
 AC_PREFIX_DEFAULT(/usr)
 AM_INIT_AUTOMAKE([subdir-objects])
@@ -53,6 +53,10 @@ fi
 AC_CHECK_LIB([asound], [snd_seq_client_info_get_pid], [HAVE_SEQ_CLIENT_INFO_GET_PID="yes"])
 if test "$HAVE_SEQ_CLIENT_INFO_GET_PID" = "yes" ; then
     AC_DEFINE([HAVE_SEQ_CLIENT_INFO_GET_PID], 1, [alsa-lib supports snd_seq_client_info_get_pid])
+fi
+AC_CHECK_LIB([asound], [snd_seq_client_info_get_midi_version], [HAVE_SEQ_CLIENT_INFO_GET_MIDI_VERSION="yes"])
+if test "$HAVE_SEQ_CLIENT_INFO_GET_MIDI_VERSION" = "yes" ; then
+    AC_DEFINE([HAVE_SEQ_CLIENT_INFO_GET_MIDI_VERSION], 1, [alsa-lib supports snd_seq_client_info_get_midi_version])
 fi
 AC_CHECK_LIB([atopology], [snd_tplg_save], [have_topology="yes"], [have_topology="no"])
 
@@ -188,6 +192,16 @@ AC_ARG_ENABLE(alsaloop,
        *) AC_MSG_ERROR(bad value ${enableval} for --enable-alsaloop) ;;
      esac],[alsaloop=true])
 AM_CONDITIONAL(ALSALOOP, test x$alsaloop = xtrue)
+
+dnl Disable nhlt
+AC_ARG_ENABLE(nhlt,
+     AS_HELP_STRING([--disable-nhlt], [Disable nhlt packaging]),
+     [case "${enableval}" in
+       yes) nhlt=true ;;
+       no)  nhlt=false ;;
+       *) AC_MSG_ERROR(bad value ${enableval} for --enable-nhlt) ;;
+     esac],[nhlt=true])
+AM_CONDITIONAL(NHLT, test x$nhlt = xtrue)
 
 xmlto_available=""
 AC_ARG_ENABLE(xmlto,
@@ -475,4 +489,5 @@ AC_OUTPUT(Makefile alsactl/Makefile alsactl/init/Makefile \
 	  seq/aplaymidi/Makefile seq/aseqdump/Makefile seq/aseqnet/Makefile \
 	  speaker-test/Makefile speaker-test/samples/Makefile \
 	  alsaloop/Makefile alsa-info/Makefile \
-	  axfer/Makefile axfer/test/Makefile)
+	  axfer/Makefile axfer/test/Makefile \
+	  nhlt/Makefile)

@@ -13,6 +13,8 @@
  *
  */
 
+#include "aconfig.h"
+
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
@@ -22,7 +24,6 @@
 
 #include <alsa/asoundlib.h>
 
-#include "aconfig.h"
 #include "gettext.h"
 
 #include "common.h"
@@ -53,7 +54,7 @@ static struct format_map_table map_tables[] = {
 	{ BAT_PCM_FORMAT_S16_LE, SND_PCM_FORMAT_S16_LE },
 	{ BAT_PCM_FORMAT_S24_3LE, SND_PCM_FORMAT_S24_3LE },
 	{ BAT_PCM_FORMAT_S32_LE, SND_PCM_FORMAT_S32_LE },
-	{ BAT_PCM_FORMAT_MAX, },
+	{ BAT_PCM_FORMAT_MAX, 0 },
 };
 
 static int format_convert(struct bat *bat, snd_pcm_format_t *fmt)
@@ -407,7 +408,7 @@ static int write_to_pcm_loop(struct pcm_container *sndpcm, struct bat *bat)
 			break;
 
 		if (bat->debugplay) {
-			if (fwrite(sndpcm->buffer, 1, bytes, fp) != bytes) {
+			if (fwrite(sndpcm->buffer, 1, bytes, fp) != (size_t)bytes) {
 				err = -EIO;
 				break;
 			}
@@ -551,7 +552,7 @@ static int read_from_pcm_loop(struct pcm_container *sndpcm, struct bat *bat)
 	int size, frames;
 	int bytes_read = 0;
 	int bytes_count = bat->frames * bat->frame_size;
-	int remain = bytes_count;
+	unsigned int remain = bytes_count;
 
 	remove(bat->capture.file);
 	fp = fopen(bat->capture.file, "wb");
@@ -579,7 +580,7 @@ static int read_from_pcm_loop(struct pcm_container *sndpcm, struct bat *bat)
 			break;
 
 		/* write the chunk to file */
-		if (fwrite(sndpcm->buffer, 1, size, fp) != size) {
+		if (fwrite(sndpcm->buffer, 1, size, fp) != (size_t)size) {
 			err = -EIO;
 			break;
 		}
@@ -646,7 +647,7 @@ static int latencytest_process_input(struct pcm_container *sndpcm,
 			break;
 
 		/* write the chunk to file */
-		if (fwrite(sndpcm->buffer, 1, size, fp) != size) {
+		if (fwrite(sndpcm->buffer, 1, size, fp) != (size_t)size) {
 			err = -EIO;
 			break;
 		}

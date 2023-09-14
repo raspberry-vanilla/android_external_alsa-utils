@@ -25,6 +25,7 @@ cc_defaults {
     shared_libs: ["libasound"],
     cflags: [
         "-Wno-absolute-value",
+        "-Wno-c2x-extensions",
         "-Wno-enum-conversion",
         "-Wno-missing-field-initializers",
         "-Wno-parentheses",

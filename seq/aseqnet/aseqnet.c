@@ -15,6 +15,7 @@
  *
  */
 
+#include "aconfig.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
@@ -28,7 +29,6 @@
 #include <getopt.h>
 #include <signal.h>
 #include <assert.h>
-#include "aconfig.h"
 #include "gettext.h"
 
 /*
@@ -334,7 +334,7 @@ static void get_net_addr(struct addrinfo *rp, char *buf, size_t buflen)
 /*
  * signal handler
  */
-static void sigterm_exit(int sig)
+static void sigterm_exit(int)
 {
 	close_files();
 	exit(1);

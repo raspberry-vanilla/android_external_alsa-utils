@@ -4,6 +4,7 @@
 //
 // Author: Jaska Uimonen <jaska.uimonen@linux.intel.com>
 
+#include "aconfig.h"
 #include <stdio.h>
 #include <stdint.h>
 #include "ssp-debug.h"
@@ -251,6 +252,6 @@ void ssp_print_internal(struct intel_ssp_params *ssp)
 }
 
 #else /* NHLT_DEBUG */
-void ssp_print_internal(struct intel_ssp_params *ssp) {}
-void ssp_print_calculated(struct intel_ssp_params *ssp) {}
+void ssp_print_internal(struct intel_ssp_params *) {}
+void ssp_print_calculated(struct intel_ssp_params *) {}
 #endif

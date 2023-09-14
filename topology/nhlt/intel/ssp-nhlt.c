@@ -4,6 +4,7 @@
 //
 // Author: Jaska Uimonen <jaska.uimonen@linux.intel.com>
 
+#include "aconfig.h"
 #include <stdint.h>
 #include <errno.h>
 #include <stdio.h>
@@ -290,7 +291,8 @@ static int set_aux_params(struct intel_nhlt_params *nhlt, snd_config_t *cfg, snd
 	snd_config_iterator_t iter, next;
 	snd_config_t *items, *n;
 	const char *id;
-	int i, ret = 0;
+	unsigned int i;
+	int ret = 0;
 
 	for (i = 0; i < ARRAY_SIZE(aux_maps); i++) {
 		if (snd_config_search(cfg, aux_maps[i].name, &items) < 0)
@@ -456,6 +458,8 @@ int nhlt_ssp_get_ep(struct intel_nhlt_params *nhlt, struct endpoint_descriptor *
 	uint32_t bits_per_sample;
 	uint32_t virtualbus_id;
 	uint32_t formats_count;
+	uint32_t device_type;
+	uint32_t direction = dir;
 	uint8_t *ep_target;
 	size_t blob_size;
 	int ret;
@@ -471,7 +475,8 @@ int nhlt_ssp_get_ep(struct intel_nhlt_params *nhlt, struct endpoint_descriptor *
 	 * vendor_blob sizeof(vendor_blob)
 	 */
 
-	ret = ssp_get_params(nhlt, dai_index, &virtualbus_id, &formats_count);
+	ret = ssp_get_params(nhlt, dai_index, &virtualbus_id, &formats_count,
+			     &device_type, &direction);
 	if (ret < 0) {
 		fprintf(stderr, "nhlt_ssp_get_ep: ssp_get_params failed\n");
 		return ret;
@@ -483,9 +488,9 @@ int nhlt_ssp_get_ep(struct intel_nhlt_params *nhlt, struct endpoint_descriptor *
 	ep.device_id = NHLT_DEVICE_ID_INTEL_I2S_TDM;
 	ep.revision_id = 0;
 	ep.subsystem_id = 0;
-	ep.device_type = 0;
+	ep.device_type = device_type;
 
-	ep.direction = dir;
+	ep.direction = direction;
 	/* ssp device index */
 	ep.virtualbus_id = virtualbus_id;
 	/* ssp config */

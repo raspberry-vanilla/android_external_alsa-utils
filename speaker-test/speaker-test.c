@@ -36,6 +36,8 @@
  * $Id: speaker_test.c,v 1.00 2003/11/26 19:43:38 jcdutton Exp $
  */
 
+#include "aconfig.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -53,7 +55,6 @@
 #include <sys/time.h>
 #include <math.h>
 #include "pink.h"
-#include "aconfig.h"
 #include "gettext.h"
 #include "version.h"
 #include "os_compat.h"
@@ -226,7 +227,7 @@ static int *order_channels(void)
 {
   /* create a (playback order => channel number) table with channels ordered
    * according to channel_order[] values */
-  int i;
+  unsigned int i;
   int *ordered_chs;
 
   ordered_chs = calloc(channel_map->channels, sizeof(*ordered_chs));
@@ -245,7 +246,7 @@ static int *order_channels(void)
 static int get_speaker_channel(int chn)
 {
 #ifdef CONFIG_SUPPORT_CHMAP
-  if (channel_map_set || (ordered_channels && chn >= channel_map->channels))
+  if (channel_map_set || (ordered_channels && (unsigned int)chn >= channel_map->channels))
     return chn;
   if (ordered_channels)
     return ordered_channels[chn];
@@ -271,7 +272,7 @@ static const char *get_channel_name(int chn)
 #ifdef CONFIG_SUPPORT_CHMAP
   if (channel_map) {
     const char *name = NULL;
-    if (chn < channel_map->channels)
+    if ((unsigned int)chn < channel_map->channels)
       name = snd_pcm_chmap_long_name(channel_map->pos[chn]);
     return name ? name : "Unknown";
   }
@@ -302,7 +303,7 @@ static void do_generate(uint8_t *frames, int channel, int count,
 			value_t (*generate)(void *), void *arg)
 {
   value_t res;
-  int    chn;
+  unsigned int chn;
   int8_t *samp8 = (int8_t*) frames;
   int16_t *samp16 = (int16_t*) frames;
   int32_t *samp32 = (int32_t*) frames;
@@ -310,7 +311,7 @@ static void do_generate(uint8_t *frames, int channel, int count,
 
   while (count-- > 0) {
     for(chn=0;chn<channels;chn++) {
-      if (chn==channel) {
+      if (chn==(unsigned int)channel) {
 	res = generate(arg);
       } else {
 	res.i = 0;
@@ -765,7 +766,7 @@ static int setup_wav_file(int chn)
     return check_wav_file(chn, given_test_wav_file);
 
 #ifdef CONFIG_SUPPORT_CHMAP
-  if (channel_map && chn < channel_map->channels) {
+  if (channel_map && (unsigned int)chn < channel_map->channels) {
     int channel = channel_map->pos[chn] - SND_CHMAP_FL;
     if (channel >= 0 && channel < MAX_CHANNELS)
       return check_wav_file(chn, wavs[channel]);
@@ -804,9 +805,9 @@ static int read_wav(uint16_t *buf, int channel, int offset, int bufsize)
     bufsize = wav_file_size[channel] - offset;
   bufsize /= channels;
   for (size = 0; size < bufsize; size += 2) {
-    int chn;
+    unsigned int chn;
     for (chn = 0; chn < channels; chn++) {
-      if (chn == channel) {
+      if (chn == (unsigned int)channel) {
 	if (fread(buf, 2, 1, wavfp) != 1)
 	  return size;
       }
@@ -870,19 +871,21 @@ static void init_loop(void)
 
 static int write_loop(snd_pcm_t *handle, int channel, int periods, uint8_t *frames)
 {
-  int    err, n;
+  unsigned int cnt;
+  int n;
+  int err;
 
   fflush(stdout);
   if (test_type == TEST_WAV) {
     int bufsize = snd_pcm_frames_to_bytes(handle, period_size);
-    n = 0;
-    while ((err = read_wav((uint16_t *)frames, channel, n, bufsize)) > 0 && !in_aborting) {
-      n += err;
+    cnt = 0;
+    while ((err = read_wav((uint16_t *)frames, channel, cnt, bufsize)) > 0 && !in_aborting) {
+      cnt += err;
       if ((err = write_buffer(handle, frames,
 			      snd_pcm_bytes_to_frames(handle, err * channels))) < 0)
 	break;
     }
-    if (buffer_size > n && !in_aborting) {
+    if (buffer_size > cnt && !in_aborting) {
       snd_pcm_drain(handle);
       snd_pcm_prepare(handle);
     }
@@ -975,7 +978,7 @@ int main(int argc, char *argv[]) {
   snd_pcm_hw_params_t  *hwparams;
   snd_pcm_sw_params_t  *swparams;
   uint8_t              *frames;
-  int                   chn;
+  unsigned int          chn;
   const int	       *fmt;
   double		time1,time2,time3;
   unsigned int		n, nloops;
@@ -1063,11 +1066,11 @@ int main(int argc, char *argv[]) {
       break;
     case 'b':
       buffer_time = atoi(optarg);
-      buffer_time = buffer_time > 1000000 ? 1000000 : buffer_time;
+      buffer_time = buffer_time > 100000000 ? 100000000 : buffer_time;
       break;
     case 'p':
       period_time = atoi(optarg);
-      period_time = period_time > 1000000 ? 1000000 : period_time;
+      period_time = period_time > 100000000 ? 100000000 : period_time;
       break;
     case 'P':
       nperiods = atoi(optarg);

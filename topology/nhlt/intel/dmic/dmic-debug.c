@@ -5,6 +5,7 @@
 // Author: Seppo Ingalsuo <seppo.ingalsuo@linux.intel.com>
 //         Jaska Uimonen <jaska.uimonen@linux.intel.com>
 
+#include "aconfig.h"
 #include <stdio.h>
 #include <stdint.h>
 #include "dmic-debug.h"
@@ -180,7 +181,7 @@ void dmic_print_internal(struct intel_dmic_params *dmic)
 }
 
 #else /* NHLT_DEBUG */
-void dmic_print_bytes_as_hex(uint8_t *src, size_t size) {}
-void dmic_print_integers_as_hex(uint32_t *src, size_t size) {}
-void dmic_print_internal(struct intel_dmic_params *dmic) {}
+void dmic_print_bytes_as_hex(uint8_t *, size_t) {}
+void dmic_print_integers_as_hex(uint32_t *, size_t) {}
+void dmic_print_internal(struct intel_dmic_params *) {}
 #endif
