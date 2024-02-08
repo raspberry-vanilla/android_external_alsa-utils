@@ -1,1 +1,1 @@
-#define SND_UTIL_VERSION_STR "1.2.10"
+#define SND_UTIL_VERSION_STR "1.2.11"

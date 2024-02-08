@@ -45,7 +45,7 @@ int debug = 0;
 #define NHLT_EP_HDR_SIZE (4 + 1 + 1 + 2 + 2 + 2 + 4 + 1 + 1 + 1)
 #define VENDOR_MIC_CFG_SIZE (1 + 1 + 2 + 2 + 2 + 1 + 1 + 2 + 2 + 2 + 2 + 2 + 2)
 
-static const char *microphone_type(u_int8_t type)
+static const char *microphone_type(uint8_t type)
 {
 	switch (type) {
 	case 0: return "omnidirectional";
@@ -59,7 +59,7 @@ static const char *microphone_type(u_int8_t type)
 	return "unknown";
 }
 
-static const char *microphone_location(u_int8_t location)
+static const char *microphone_location(uint8_t location)
 {
 	switch (location) {
 	case 0: return "laptop-top-panel";
@@ -73,21 +73,21 @@ static const char *microphone_location(u_int8_t location)
 }
 
 
-static inline u_int8_t get_u8(u_int8_t *base, u_int32_t off)
+static inline uint8_t get_u8(uint8_t *base, uint32_t off)
 {
 	return *(base + off);
 }
 
-static inline int32_t get_s16le(u_int8_t *base, u_int32_t off)
+static inline int32_t get_s16le(uint8_t *base, uint32_t off)
 {
-	u_int32_t v =  *(base + off + 0) |
+	uint32_t v =  *(base + off + 0) |
 		      (*(base + off + 1) << 8);
 	if (v & 0x8000)
 		return -((int32_t)0x10000 - (int32_t)v);
 	return v;
 }
 
-static inline u_int32_t get_u32le(u_int8_t *base, u_int32_t off)
+static inline uint32_t get_u32le(uint8_t *base, uint32_t off)
 {
 	return   *(base + off + 0) |
 		(*(base + off + 1) << 8) |
@@ -137,10 +137,10 @@ static int nhlt_dmic_config(FILE *out, uint8_t *dmic, uint8_t mic)
 	return 0;
 }
 
-static int nhlt_dmic_ep_to_json(FILE *out, uint8_t *ep, u_int32_t ep_size)
+static int nhlt_dmic_ep_to_json(FILE *out, uint8_t *ep, uint32_t ep_size)
 {
-	u_int32_t off, specific_cfg_size;
-	u_int8_t config_type, array_type, mic, num_mics;
+	uint32_t off, specific_cfg_size;
+	uint8_t config_type, array_type, mic, num_mics;
 	int res;
 
 	off = NHLT_EP_HDR_SIZE;
@@ -181,15 +181,15 @@ oob:
 	return -EINVAL;
 }
 
-static int nhlt_table_to_json(FILE *out, u_int8_t *nhlt, u_int32_t size)
+static int nhlt_table_to_json(FILE *out, uint8_t *nhlt, uint32_t size)
 {
-	u_int32_t _size, off, ep_size;
-	u_int8_t sum = 0, ep, ep_count, link_type, dmics = 0;
+	uint32_t _size, off, ep_size;
+	uint8_t sum = 0, ep, ep_count, link_type, dmics = 0;
 	int res;
 
 	_size = get_u32le(nhlt, 4);
 	if (_size != size) {
-		fprintf(stderr, "Table size mismatch (%08x != %08x)\n", _size, (u_int32_t)size);
+		fprintf(stderr, "Table size mismatch (%08x != %08x)\n", _size, (uint32_t)size);
 		return -EINVAL;
 	}
 	for (off = 0; off < size; off++)
@@ -231,7 +231,7 @@ oob:
 static int nhlt_to_json(FILE *out, const char *nhlt_file)
 {
 	struct stat st;
-	u_int8_t *buf;
+	uint8_t *buf;
 	int _errno, fd, res;
 	size_t pos, size;
 	ssize_t ret;
@@ -248,6 +248,7 @@ static int nhlt_to_json(FILE *out, const char *nhlt_file)
 	if (fd < 0) {
 		_errno = errno;
 		fprintf(stderr, "Unable to open file '%s': %s\n", nhlt_file, strerror(errno));
+		free(buf);
 		return _errno;
 	}
 	pos = 0;
@@ -404,7 +405,7 @@ int main(int argc, char *argv[])
 		output = fopen(output_file, "w+");
 		if (output == NULL) {
 			fprintf(stderr, "Unable to create output file \"%s\": %s\n",
-						output_file, strerror(-errno));
+						output_file, strerror(errno));
 			res = EXIT_FAILURE;
 			goto out;
 		}

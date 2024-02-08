@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <alsa/global.h>
 #include <alsa/input.h>
 #include <alsa/output.h>
 #include <alsa/conf.h>
@@ -782,7 +783,7 @@ int ssp_get_params(struct intel_nhlt_params *nhlt, int dai_index, uint32_t *virt
 	if (ssp->ssp_prm[dai_index].quirks & SSP_INTEL_QUIRK_BT_SIDEBAND)
 		*device_type = NHLT_DEVICE_TYPE_SSP_BT_SIDEBAND;
 	else
-		*device_type = NHLT_DEVICE_TYPE_SSP_ANALOG;
+		*device_type = 0;
 	if (ssp->ssp_prm[dai_index].quirks & SSP_INTEL_QUIRK_RENDER_FEEDBACK) {
 		if (*direction == NHLT_ENDPOINT_DIRECTION_RENDER)
 			*direction = NHLT_ENDPOINT_DIRECTION_RENDER_WITH_LOOPBACK;
@@ -937,6 +938,7 @@ int ssp_set_params(struct intel_nhlt_params *nhlt, const char *dir, int dai_inde
 					ssp->ssp_prm[ssp->ssp_count].quirks |= SSP_INTEL_QUIRK_RENDER_FEEDBACK;
 			} else {
 				fprintf(stderr, "ssp_set_params(): unknown quirk %s\n", token);
+				free(buf);
 				return -EINVAL;
 			}
 
@@ -952,7 +954,8 @@ int ssp_set_params(struct intel_nhlt_params *nhlt, const char *dir, int dai_inde
 	return 0;
 }
 
-int ssp_hw_set_params(struct intel_nhlt_params *nhlt, const char *format, const char *,
+int ssp_hw_set_params(struct intel_nhlt_params *nhlt, const char *format,
+		      const char *mclk ATTRIBUTE_UNUSED,
 		      const char *bclk, const char *bclk_invert, const char *fsync,
 		      const char *fsync_invert, int mclk_freq, int bclk_freq, int fsync_freq,
 		      int tdm_slots, int tdm_slot_width, int tx_slots, int rx_slots)
