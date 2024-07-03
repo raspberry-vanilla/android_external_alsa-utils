@@ -1,6 +1,6 @@
 dnl Process this file with autoconf to produce a configure script.
 AC_PREREQ(2.59)
-AC_INIT(alsa-utils, 1.2.11)
+AC_INIT(alsa-utils, 1.2.12)
 AC_CONFIG_SRCDIR([aplay/aplay.c])
 AC_PREFIX_DEFAULT(/usr)
 AM_INIT_AUTOMAKE([subdir-objects])
@@ -487,7 +487,7 @@ AC_OUTPUT(Makefile alsactl/Makefile alsactl/init/Makefile \
 	  aplay/Makefile include/Makefile iecset/Makefile utils/Makefile \
 	  utils/alsa-utils.spec seq/Makefile seq/aconnect/Makefile \
 	  seq/aplaymidi/Makefile seq/aseqdump/Makefile seq/aseqnet/Makefile \
-	  speaker-test/Makefile speaker-test/samples/Makefile \
+	  seq/aseqsend/Makefile speaker-test/Makefile speaker-test/samples/Makefile \
 	  alsaloop/Makefile alsa-info/Makefile \
 	  axfer/Makefile axfer/test/Makefile \
 	  nhlt/Makefile)
