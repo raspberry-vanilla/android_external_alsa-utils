@@ -1,6 +1,6 @@
 dnl Process this file with autoconf to produce a configure script.
 AC_PREREQ(2.59)
-AC_INIT(alsa-utils, 1.2.12)
+AC_INIT(alsa-utils, 1.2.13)
 AC_CONFIG_SRCDIR([aplay/aplay.c])
 AC_PREFIX_DEFAULT(/usr)
 AM_INIT_AUTOMAKE([subdir-objects])
@@ -21,7 +21,7 @@ AC_PROG_SED
 AC_DISABLE_STATIC
 AM_PROG_LIBTOOL
 PKG_PROG_PKG_CONFIG
-AM_PATH_ALSA(1.2.5)
+AM_PATH_ALSA(1.2.13)
 if test "x$enable_alsatest" = "xyes"; then
 AC_CHECK_FUNC([snd_ctl_elem_add_enumerated],
 	      , [AC_ERROR([No user enum control support in alsa-lib])])
@@ -47,17 +47,6 @@ AC_CHECK_HEADERS([samplerate.h], [have_samplerate="yes"], [have_samplerate="no"]
   [#include <samplerate.h>])
 
 AC_CHECK_LIB([asound], [snd_seq_client_info_get_card], [HAVE_SEQ_CLIENT_INFO_GET_CARD="yes"])
-if test "$HAVE_SEQ_CLIENT_INFO_GET_CARD" = "yes" ; then
-    AC_DEFINE([HAVE_SEQ_CLIENT_INFO_GET_CARD], 1, [alsa-lib supports snd_seq_client_info_get_card])
-fi
-AC_CHECK_LIB([asound], [snd_seq_client_info_get_pid], [HAVE_SEQ_CLIENT_INFO_GET_PID="yes"])
-if test "$HAVE_SEQ_CLIENT_INFO_GET_PID" = "yes" ; then
-    AC_DEFINE([HAVE_SEQ_CLIENT_INFO_GET_PID], 1, [alsa-lib supports snd_seq_client_info_get_pid])
-fi
-AC_CHECK_LIB([asound], [snd_seq_client_info_get_midi_version], [HAVE_SEQ_CLIENT_INFO_GET_MIDI_VERSION="yes"])
-if test "$HAVE_SEQ_CLIENT_INFO_GET_MIDI_VERSION" = "yes" -a "$have_rawmidi" = "yes"; then
-    AC_DEFINE([HAVE_SEQ_CLIENT_INFO_GET_MIDI_VERSION], 1, [alsa-lib supports snd_seq_client_info_get_midi_version])
-fi
 AC_CHECK_LIB([atopology], [snd_tplg_save], [have_topology="yes"], [have_topology="no"])
 
 #
@@ -457,6 +446,21 @@ AC_ARG_WITH([alsactl-daemonswitch],
         [ALSACTL_DAEMONSWITCH="/etc/alsa/state-daemon.conf"])
 AC_SUBST(ALSACTL_DAEMONSWITCH)
 
+AC_ARG_WITH([alsactl-udev-extra-test],
+        AS_HELP_STRING([--with-alsactl-udev-extra-test=TEST], [Extra udev tests]),
+        [ALSACTL_UDEV_EXTRATEST="$withval"],
+        [ALSACTL_UDEV_EXTRATEST="default"])
+if test "$ALSACTL_UDEV_EXTRATEST" = "default"; then
+  ALSACTL_UDEV_EXTRATEST="TEST==\"${sbindir}\", TEST==\"${mydatadir}\","
+fi
+AC_SUBST(ALSACTL_UDEV_EXTRATEST)
+
+AC_ARG_WITH([alsactl-udev-args],
+        AS_HELP_STRING([--with-alsactl-udev-args=ARGS], [Extra alsactl arguments (udev rules)]),
+        [ALSACTL_UDEV_ARGS="$withval"],
+        [ALSACTL_UDEV_ARGS=""])
+AC_SUBST(ALSACTL_UDEV_ARGS)
+
 dnl pre-process plugin directory
 AC_ARG_WITH(plugindir,
     AS_HELP_STRING([--with-plugindir=dir],
@@ -486,7 +490,7 @@ AC_OUTPUT(Makefile alsactl/Makefile alsactl/init/Makefile \
 	  bat/Makefile bat/tests/Makefile bat/tests/asound_state/Makefile \
 	  aplay/Makefile include/Makefile iecset/Makefile utils/Makefile \
 	  utils/alsa-utils.spec seq/Makefile seq/aconnect/Makefile \
-	  seq/aplaymidi/Makefile seq/aseqdump/Makefile seq/aseqnet/Makefile \
+	  seq/aplaymidi/Makefile seq/aplaymidi2/Makefile seq/aseqdump/Makefile seq/aseqnet/Makefile \
 	  seq/aseqsend/Makefile speaker-test/Makefile speaker-test/samples/Makefile \
 	  alsaloop/Makefile alsa-info/Makefile \
 	  axfer/Makefile axfer/test/Makefile \

@@ -29,9 +29,7 @@
 #include <poll.h>
 #include <alsa/asoundlib.h>
 #include "version.h"
-#ifdef HAVE_SEQ_CLIENT_INFO_GET_MIDI_VERSION
 #include <alsa/ump_msg.h>
-#endif
 
 enum {
 	VIEW_RAW, VIEW_NORMALIZED, VIEW_PERCENT
@@ -41,11 +39,7 @@ static snd_seq_t *seq;
 static int port_count;
 static snd_seq_addr_t *ports;
 static volatile sig_atomic_t stop = 0;
-#ifdef HAVE_SEQ_CLIENT_INFO_GET_MIDI_VERSION
 static int ump_version;
-#else
-#define ump_version	0
-#endif
 static int view_mode = VIEW_RAW;
 
 /* prints an error message to stderr, and dies */
@@ -368,7 +362,6 @@ static void dump_event(const snd_seq_event_t *ev)
 	}
 }
 
-#ifdef HAVE_SEQ_CLIENT_INFO_GET_MIDI_VERSION
 static int group_number(unsigned char c)
 {
 	if (view_mode != VIEW_RAW)
@@ -442,7 +435,7 @@ static const char *midi2_velocity(unsigned int v)
 			snprintf(tmp, sizeof(tmp), "%.2f",
 				 ((double)v * 64.0) / 0x8000);
 		else
-			snprintf(tmp, sizeof(tmp), ".2%f",
+			snprintf(tmp, sizeof(tmp), "%.2f",
 				 ((double)(v - 0x8000) * 63.0) / 0x7fff + 64.0);
 		return tmp;
 	} else if (view_mode == VIEW_PERCENT) {
@@ -668,6 +661,354 @@ static void dump_ump_system_event(const unsigned int *ump)
 	}
 }
 
+static unsigned char ump_sysex7_data(const unsigned int *ump,
+				     unsigned int offset)
+{
+	return snd_ump_get_byte(ump, offset + 2);
+}
+
+static void dump_ump_sysex_status(const char *prefix, unsigned int status)
+{
+	printf("%s ", prefix);
+	switch (status) {
+	case SND_UMP_SYSEX_STATUS_SINGLE:
+		printf("Single  ");
+		break;
+	case SND_UMP_SYSEX_STATUS_START:
+		printf("Start   ");
+		break;
+	case SND_UMP_SYSEX_STATUS_CONTINUE:
+		printf("Continue");
+		break;
+	case SND_UMP_SYSEX_STATUS_END:
+		printf("End     ");
+		break;
+	default:
+		printf("(0x%04x)", status);
+		break;
+	}
+}
+
+static void dump_ump_sysex_event(const unsigned int *ump)
+{
+	int i, length;
+
+	printf("Group %2d, ", group_number(snd_ump_msg_group(ump)));
+	dump_ump_sysex_status("SysEx", snd_ump_sysex_msg_status(ump));
+	length = snd_ump_sysex_msg_length(ump);
+	printf(" length %d ", length);
+	if (length > 6)
+		length = 6;
+	for (i = 0; i < length; i++)
+		printf("%s%02x", i ? ":" : "", ump_sysex7_data(ump, i));
+	printf("\n");
+}
+
+static unsigned char ump_sysex8_data(const unsigned int *ump,
+				     unsigned int offset)
+{
+	return snd_ump_get_byte(ump, offset + 3);
+}
+
+static void dump_ump_sysex8_event(const unsigned int *ump)
+{
+	int i, length;
+
+	printf("Group %2d, ", group_number(snd_ump_msg_group(ump)));
+	dump_ump_sysex_status("SysEx8", snd_ump_sysex_msg_status(ump));
+	length = snd_ump_sysex_msg_length(ump);
+	printf(" length %d ", length);
+	printf(" stream %d ", (ump[0] >> 8) & 0xff);
+	if (length > 13)
+		length = 13;
+	for (i = 0; i < length; i++)
+		printf("%s%02x", i ? ":" : "", ump_sysex8_data(ump, i));
+	printf("\n");
+}
+
+static void dump_ump_mixed_data_event(const unsigned int *ump)
+{
+	const snd_ump_msg_mixed_data_t *m =
+		(const snd_ump_msg_mixed_data_t *)ump;
+	int i;
+
+	printf("Group %2d, ", group_number(snd_ump_msg_group(ump)));
+	switch (snd_ump_sysex_msg_status(ump)) {
+	case SND_UMP_MIXED_DATA_SET_STATUS_HEADER:
+		printf("MDS Header id=0x%x, bytes=%d, chunk=%d/%d, manufacturer=0x%04x, device=0x%04x, sub_id=0x%04x 0x%04x\n",
+		       m->header.mds_id, m->header.bytes,
+		       m->header.chunk, m->header.chunks,
+		       m->header.manufacturer, m->header.device,
+		       m->header.sub_id_1, m->header.sub_id_2);
+		break;
+	case SND_UMP_MIXED_DATA_SET_STATUS_PAYLOAD:
+		printf("MDS Payload id=0x%x, ", m->payload.mds_id);
+		for (i = 0; i < 14; i++)
+			printf("%s%02x", i ? ":" : "",
+			       snd_ump_get_byte(ump, i + 2));
+		printf("\n");
+		break;
+	default:
+		printf("Extended Data (status 0x%x)\n",
+		       snd_ump_sysex_msg_status(ump));
+		break;
+	}
+}
+
+static void dump_ump_extended_data_event(const unsigned int *ump)
+{
+	unsigned char status = snd_ump_sysex_msg_status(ump);
+
+	if (status < 4)
+		dump_ump_sysex8_event(ump);
+	else
+		dump_ump_mixed_data_event(ump);
+}
+
+static void print_ump_string(const unsigned int *ump, unsigned int fmt,
+			     unsigned int offset, int maxlen)
+{
+	static const char *fmtstr[4] = { "Single", "Start", "Cont", "End" };
+	unsigned char buf[32];
+	int i = 0;
+
+	do {
+		buf[i] = snd_ump_get_byte(ump, offset);
+		if (!buf[i])
+			break;
+		if (buf[i] < 0x20)
+			buf[i] = '.';
+		offset++;
+	} while (++i < maxlen);
+	buf[i] = 0;
+
+	printf("%6s: %s", fmtstr[fmt], buf);
+}
+
+static void dump_ump_stream_event(const unsigned int *ump)
+{
+	const snd_ump_msg_stream_t *s = (const snd_ump_msg_stream_t *)ump;
+
+	printf("          "); /* stream message is groupless */
+	switch (s->gen.status) {
+	case SND_UMP_STREAM_MSG_STATUS_EP_DISCOVERY:
+		printf("EP Discovery    ver=%d/%d, filter=0x%x\n",
+		       (ump[0] >> 8) & 0xff, ump[0] & 0xff, ump[1] & 0xff);
+		break;
+	case SND_UMP_STREAM_MSG_STATUS_EP_INFO:
+		printf("EP Info         ver=%d/%d, static=%d, fb#=%d, midi2=%d, midi1=%d, rxjr=%d, txjr=%d\n",
+		       (ump[0] >> 8) & 0xff, ump[0] & 0xff, (ump[1] >> 31),
+		       (ump[1] >> 24) & 0x7f,
+		       (ump[1] >> 9) & 1, (ump[1] >> 8) & 1,
+		       (ump[1] >> 1) & 1, ump[1] & 1);
+		break;
+	case SND_UMP_STREAM_MSG_STATUS_DEVICE_INFO:
+		printf("Device Info     sysid=%02x:%02x:%02x, family=%02x:%02x, model=%02x:%02x, rev=%02x:%02x:%02x:%02x\n",
+		       (ump[1] >> 16) & 0x7f, (ump[1] >> 8) & 0x7f, ump[1] & 0x7f,
+		       (ump[2] >> 16) & 0x7f, (ump[2] >> 24) & 0x7f,
+		       ump[2] & 0x7f, (ump[2] >> 8) & 0x7f,
+		       (ump[3] >> 24) & 0x7f, (ump[3] >> 16) & 0x7f,
+		       (ump[3] >> 8) & 0x7f, ump[3] & 0x7f);
+		break;
+	case SND_UMP_STREAM_MSG_STATUS_EP_NAME:
+		printf("EP Name        ");
+		print_ump_string(ump, (ump[0] >> 26) & 3, 2, 14);
+		printf("\n");
+		break;
+	case SND_UMP_STREAM_MSG_STATUS_PRODUCT_ID:
+		printf("Product Id     ");
+		print_ump_string(ump, (ump[0] >> 26) & 3, 2, 14);
+		printf("\n");
+		break;
+	case SND_UMP_STREAM_MSG_STATUS_STREAM_CFG_REQUEST:
+		printf("Stream Cfg Req protocl=%d, rxjr=%d, txjr=%d\n",
+		       (ump[0] >> 8) & 0xff, (ump[0] >> 1) & 1, ump[0] & 1);
+		break;
+	case SND_UMP_STREAM_MSG_STATUS_STREAM_CFG:
+		printf("Stream Cfg     protocl=%d, rxjr=%d, txjr=%d\n",
+		       (ump[0] >> 8) & 0xff, (ump[0] >> 1) & 1, ump[0] & 1);
+		break;
+	case SND_UMP_STREAM_MSG_STATUS_FB_DISCOVERY:
+		printf("FB Discovery   fb#=%d, filter=0x%x\n",
+		       (ump[0] >> 8) & 0xff, ump[0] & 0xff);
+		break;
+	case SND_UMP_STREAM_MSG_STATUS_FB_INFO:
+		printf("FB Info        fb#=%d, active=%d, ui=%d, MIDI1=%d, dir=%d, group=%d-%d, MIDI-CI=%d, SysEx8=%d\n",
+		       (ump[0] >> 8) & 0x7f, (ump[0] >> 15) & 1,
+		       (ump[0] >> 4) & 3, (ump[0] >> 2) & 3, ump[0] & 3,
+		       (ump[1] >> 24) & 0xff, (ump[1] >> 16) & 0xff,
+		       (ump[1] >> 8) * 0xff, ump[1] & 0xff);
+		break;
+	case SND_UMP_STREAM_MSG_STATUS_FB_NAME:
+		printf("Product Id     ");
+		printf("FB Name #%02d    ", (ump[0] >> 8) & 0xff);
+		print_ump_string(ump, (ump[0] >> 26) & 3, 3, 13);
+		printf("\n");
+		break;
+	case SND_UMP_STREAM_MSG_STATUS_START_CLIP:
+		printf("Start Clip\n");
+		break;
+	case SND_UMP_STREAM_MSG_STATUS_END_CLIP:
+		printf("End Clip\n");
+		break;
+	default:
+		printf("UMP Stream event: status = %d, 0x%08x:0x%08x:0x%08x:0x%08x\n",
+		       s->gen.status, ump[0], ump[1], ump[2], ump[3]);
+		break;
+	}
+}
+
+struct flexdata_text_prefix {
+	unsigned char status_bank;
+	unsigned char status;
+	const char *prefix;
+};
+
+static struct flexdata_text_prefix text_prefix[] = {
+	{ .status_bank = SND_UMP_FLEX_DATA_MSG_BANK_METADATA,
+	  .status = SND_UMP_FLEX_DATA_MSG_STATUS_PROJECT_NAME,
+	  .prefix = "Project" },
+	{ .status_bank = SND_UMP_FLEX_DATA_MSG_BANK_METADATA,
+	  .status = SND_UMP_FLEX_DATA_MSG_STATUS_SONG_NAME,
+	  .prefix = "Song" },
+	{ .status_bank = SND_UMP_FLEX_DATA_MSG_BANK_METADATA,
+	  .status = SND_UMP_FLEX_DATA_MSG_STATUS_MIDI_CLIP_NAME,
+	  .prefix = "MIDI Clip" },
+	{ .status_bank = SND_UMP_FLEX_DATA_MSG_BANK_METADATA,
+	  .status = SND_UMP_FLEX_DATA_MSG_STATUS_COPYRIGHT_NOTICE,
+	  .prefix = "Copyright" },
+	{ .status_bank = SND_UMP_FLEX_DATA_MSG_BANK_METADATA,
+	  .status = SND_UMP_FLEX_DATA_MSG_STATUS_COMPOSER_NAME,
+	  .prefix = "Composer" },
+	{ .status_bank = SND_UMP_FLEX_DATA_MSG_BANK_METADATA,
+	  .status = SND_UMP_FLEX_DATA_MSG_STATUS_LYRICIST_NAME,
+	  .prefix = "Lyricist" },
+	{ .status_bank = SND_UMP_FLEX_DATA_MSG_BANK_METADATA,
+	  .status = SND_UMP_FLEX_DATA_MSG_STATUS_ARRANGER_NAME,
+	  .prefix = "Arranger" },
+	{ .status_bank = SND_UMP_FLEX_DATA_MSG_BANK_METADATA,
+	  .status = SND_UMP_FLEX_DATA_MSG_STATUS_PUBLISHER_NAME,
+	  .prefix = "Publisher" },
+	{ .status_bank = SND_UMP_FLEX_DATA_MSG_BANK_METADATA,
+	  .status = SND_UMP_FLEX_DATA_MSG_STATUS_PRIMARY_PERFORMER,
+	  .prefix = "Performer" },
+	{ .status_bank = SND_UMP_FLEX_DATA_MSG_BANK_METADATA,
+	  .status = SND_UMP_FLEX_DATA_MSG_STATUS_ACCOMPANY_PERFORMAER,
+	  .prefix = "Accompany Performer" },
+	{ .status_bank = SND_UMP_FLEX_DATA_MSG_BANK_METADATA,
+	  .status = SND_UMP_FLEX_DATA_MSG_STATUS_RECORDING_DATE,
+	  .prefix = "Recording Date" },
+	{ .status_bank = SND_UMP_FLEX_DATA_MSG_BANK_METADATA,
+	  .status = SND_UMP_FLEX_DATA_MSG_STATUS_RECORDING_LOCATION,
+	  .prefix = "Recording Location" },
+	{ .status_bank = SND_UMP_FLEX_DATA_MSG_BANK_PERF_TEXT,
+	  .status = SND_UMP_FLEX_DATA_MSG_STATUS_LYRICS,
+	  .prefix = "Lyrics" },
+	{ .status_bank = SND_UMP_FLEX_DATA_MSG_BANK_PERF_TEXT,
+	  .status = SND_UMP_FLEX_DATA_MSG_STATUS_LYRICS_LANGUAGE,
+	  .prefix = "Lyrics Language" },
+	{ .status_bank = SND_UMP_FLEX_DATA_MSG_BANK_PERF_TEXT,
+	  .status = SND_UMP_FLEX_DATA_MSG_STATUS_RUBY,
+	  .prefix = "Ruby" },
+	{ .status_bank = SND_UMP_FLEX_DATA_MSG_BANK_PERF_TEXT,
+	  .status = SND_UMP_FLEX_DATA_MSG_STATUS_RUBY_LANGUAGE,
+	  .prefix = "Ruby Language" },
+	{}
+};
+
+static const char *ump_meta_prefix(const snd_ump_msg_flex_data_t *fh)
+{
+	static char buf[32];
+	int i;
+
+	for (i = 0; text_prefix[i].status_bank; i++) {
+		if (text_prefix[i].status_bank == fh->meta.status_bank &&
+		    text_prefix[i].status == fh->meta.status)
+			return text_prefix[i].prefix;
+	}
+
+	sprintf(buf, "(%d:%d)", fh->meta.status_bank, fh->meta.status);
+	return buf;
+}
+
+static void dump_ump_flex_data_event(const unsigned int *ump)
+{
+	const snd_ump_msg_flex_data_t *fh =
+		(const snd_ump_msg_flex_data_t *)ump;
+
+	printf("Group %2d, ", group_number(snd_ump_msg_group(ump)));
+
+	if (fh->meta.status_bank == SND_UMP_FLEX_DATA_MSG_BANK_SETUP &&
+	    fh->meta.status == SND_UMP_FLEX_DATA_MSG_STATUS_SET_TEMPO) {
+		printf("UMP Set Tempo          value %d\n", fh->set_tempo.tempo);
+		return;
+	}
+
+	if (fh->meta.status_bank == SND_UMP_FLEX_DATA_MSG_BANK_SETUP &&
+	    fh->meta.status == SND_UMP_FLEX_DATA_MSG_STATUS_SET_TIME_SIGNATURE) {
+		printf("UMP Set Time Signature value %d / %d, num_notes %d\n",
+		       fh->set_time_sig.numerator, fh->set_time_sig.denominator,
+		       fh->set_time_sig.num_notes);
+		return;
+	}
+
+	if (fh->meta.status_bank == SND_UMP_FLEX_DATA_MSG_BANK_SETUP &&
+	    fh->meta.status == SND_UMP_FLEX_DATA_MSG_STATUS_SET_METRONOME) {
+		printf("UMP Set Metronome      clock %d, bar %d/%d/%d, sub %d/%d\n",
+		       fh->set_metronome.clocks_primary,
+		       fh->set_metronome.bar_accent_1,
+		       fh->set_metronome.bar_accent_2,
+		       fh->set_metronome.bar_accent_3,
+		       fh->set_metronome.subdivision_1,
+		       fh->set_metronome.subdivision_2);
+		return;
+	}
+
+	if (fh->meta.status_bank == SND_UMP_FLEX_DATA_MSG_BANK_SETUP &&
+	    fh->meta.status == SND_UMP_FLEX_DATA_MSG_STATUS_SET_KEY_SIGNATURE) {
+		printf("UMP Set Key Signature     sharps/flats %d, tonic %d\n",
+		       fh->set_key_sig.sharps_flats,
+		       fh->set_key_sig.tonic_note);
+		return;
+	}
+
+	if (fh->meta.status_bank == SND_UMP_FLEX_DATA_MSG_BANK_SETUP &&
+	    fh->meta.status == SND_UMP_FLEX_DATA_MSG_STATUS_SET_CHORD_NAME) {
+		printf("UMP Set Chord Name     tonic %d %d %d, alt1 %d/%d, alt2 %d/%d, alt3 %d/%d, alt4 %d/%d, bass %d %d %d, alt1 %d/%d alt2 %d/%d\n",
+		       fh->set_chord_name.tonic_sharp,
+		       fh->set_chord_name.chord_tonic,
+		       fh->set_chord_name.chord_type,
+		       fh->set_chord_name.alter1_type,
+		       fh->set_chord_name.alter1_degree,
+		       fh->set_chord_name.alter2_type,
+		       fh->set_chord_name.alter2_degree,
+		       fh->set_chord_name.alter3_type,
+		       fh->set_chord_name.alter3_degree,
+		       fh->set_chord_name.alter4_type,
+		       fh->set_chord_name.alter4_degree,
+		       fh->set_chord_name.bass_sharp,
+		       fh->set_chord_name.bass_note,
+		       fh->set_chord_name.bass_type,
+		       fh->set_chord_name.bass_alter1_type,
+		       fh->set_chord_name.bass_alter1_type,
+		       fh->set_chord_name.bass_alter2_degree,
+		       fh->set_chord_name.bass_alter2_degree);
+		return;
+	}
+
+	if (fh->meta.status_bank == SND_UMP_FLEX_DATA_MSG_BANK_METADATA ||
+	    fh->meta.status_bank == SND_UMP_FLEX_DATA_MSG_BANK_PERF_TEXT) {
+		printf("Meta (%s) ", ump_meta_prefix(fh));
+		print_ump_string(ump, fh->meta.format, 4, 12);
+		printf("\n");
+		return;
+	}
+
+	printf("Flex Data: channel = %d, format = %d, addrs = %d, status_bank = %d, status = %d\n",
+	       fh->meta.channel, fh->meta.format, fh->meta.addrs,
+	       fh->meta.status_bank, fh->meta.status);
+}
+
 static void dump_ump_event(const snd_seq_ump_event_t *ev)
 {
 	if (!snd_seq_ev_is_ump(ev)) {
@@ -690,6 +1031,18 @@ static void dump_ump_event(const snd_seq_ump_event_t *ev)
 	case SND_UMP_MSG_TYPE_MIDI2_CHANNEL_VOICE:
 		dump_ump_midi2_event(ev->ump);
 		break;
+	case SND_UMP_MSG_TYPE_DATA:
+		dump_ump_sysex_event(ev->ump);
+		break;
+	case SND_UMP_MSG_TYPE_EXTENDED_DATA:
+		dump_ump_extended_data_event(ev->ump);
+		break;
+	case SND_UMP_MSG_TYPE_FLEX_DATA:
+		dump_ump_flex_data_event(ev->ump);
+		break;
+	case SND_UMP_MSG_TYPE_STREAM:
+		dump_ump_stream_event(ev->ump);
+		break;
 	default:
 		printf("UMP event: type = %d, group = %d, status = %d, 0x%08x\n",
 		       snd_ump_msg_type(ev->ump),
@@ -699,7 +1052,6 @@ static void dump_ump_event(const snd_seq_ump_event_t *ev)
 		break;
 	}
 }
-#endif /* HAVE_SEQ_CLIENT_INFO_GET_MIDI_VERSION */
 
 static void list_ports(void)
 {
@@ -742,10 +1094,8 @@ static void help(const char *argv0)
 		"  -N,--normalized-view       show normalized values\n"
 		"  -P,--percent-view          show percent values\n"
 		"  -R,--raw-view              show raw values (default)\n"
-#ifdef HAVE_SEQ_CLIENT_INFO_GET_MIDI_VERSION
 		"  -u,--ump=version           set client MIDI version (0=legacy, 1= UMP MIDI 1.0, 2=UMP MIDI2.0)\n"
 		"  -r,--raw                   do not convert UMP and legacy events\n"
-#endif
 		"  -p,--port=client:port,...  source port(s)\n",
 		argv0);
 }
@@ -762,11 +1112,7 @@ static void sighandler(int sig ATTRIBUTE_UNUSED)
 
 int main(int argc, char *argv[])
 {
-	static const char short_options[] = "hVlp:NPR"
-#ifdef HAVE_SEQ_CLIENT_INFO_GET_MIDI_VERSION
-		"u:r"
-#endif
-		;
+	static const char short_options[] = "hVlp:NPRu:r";
 	static const struct option long_options[] = {
 		{"help", 0, NULL, 'h'},
 		{"version", 0, NULL, 'V'},
@@ -775,10 +1121,8 @@ int main(int argc, char *argv[])
 		{"normalized-view", 0, NULL, 'N'},
 		{"percent-view", 0, NULL, 'P'},
 		{"raw-view", 0, NULL, 'R'},
-#ifdef HAVE_SEQ_CLIENT_INFO_GET_MIDI_VERSION
 		{"ump", 1, NULL, 'u'},
 		{"raw", 0, NULL, 'r'},
-#endif
 		{0}
 	};
 
@@ -813,15 +1157,15 @@ int main(int argc, char *argv[])
 		case 'N':
 			view_mode = VIEW_NORMALIZED;
 			break;
-#ifdef HAVE_SEQ_CLIENT_INFO_GET_MIDI_VERSION
 		case 'u':
 			ump_version = atoi(optarg);
+			if (ump_version < 0 || ump_version > 2)
+				fatal("Invalid UMP version %d", ump_version);
 			snd_seq_set_client_midi_version(seq, ump_version);
 			break;
 		case 'r':
 			snd_seq_set_client_ump_conversion(seq, 0);
 			break;
-#endif
 		default:
 			help(argv[0]);
 			return 1;
@@ -863,7 +1207,6 @@ int main(int argc, char *argv[])
 			break;
 		for (;;) {
 			snd_seq_event_t *event;
-#ifdef HAVE_SEQ_CLIENT_INFO_GET_MIDI_VERSION
 			snd_seq_ump_event_t *ump_ev;
 			if (ump_version > 0) {
 				err = snd_seq_ump_event_input(seq, &ump_ev);
@@ -873,7 +1216,6 @@ int main(int argc, char *argv[])
 					dump_ump_event(ump_ev);
 				continue;
 			}
-#endif
 
 			err = snd_seq_event_input(seq, &event);
 			if (err < 0)
