@@ -1,0 +1,75 @@
+#!/bin/bash
+
+#
+# Copyright (C) 2025 KonstaKANG
+#
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
+
+if [ ! -d "$ANDROID_NDK_HOME" ]; then
+  echo "ANDROID_NDK_HOME environment variable is not properly set!"
+  exit 1
+fi
+
+export TOOLCHAIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64
+
+export TARGET=aarch64-linux-android
+export API=35
+export CC="$TOOLCHAIN/bin/clang --target=$TARGET$API"
+export CXX="$TOOLCHAIN/bin/clang++ --target=$TARGET$API"
+export AR=$TOOLCHAIN/bin/llvm-ar
+export AS=$CC
+export LD=$TOOLCHAIN/bin/ld
+export RANLIB=$TOOLCHAIN/bin/llvm-ranlib
+export STRIP=$TOOLCHAIN/bin/llvm-strip
+
+echo "Running autoconf..."
+aclocal -I ../alsa-lib/utils
+cp Makefile.am Makefile.am.ok
+cp configure.ac configure.ac.ok
+gettextize -c -f --no-changelog
+echo "EXTRA_DIST = gettext.m4" > m4/Makefile.am
+cp Makefile.am.ok Makefile.am
+cp configure.ac.ok configure.ac
+touch ltconfig
+libtoolize --force --copy --automake
+aclocal -I ../alsa-lib/utils
+autoheader
+automake --foreign --copy --add-missing
+touch depcomp
+autoconf
+
+ALSA_CONFIG=" \
+--datadir=/vendor/usr/share \
+--disable-alsatest \
+--host=aarch64-linux"
+
+echo "Generating configuration..."
+echo "./configure $ALSA_CONFIG $TARGET"
+./configure $ALSA_CONFIG $TARGET
+
+cat > include/version.h <<EOF
+/*
+ *  version.h
+ */
+
+#define SND_UTIL_MAJOR		$(cat version | cut -d . -f 1)
+#define SND_UTIL_MINOR		$(cat version | cut -d . -f 2)
+#define SND_UTIL_SUBMINOR	$(cat version | cut -d . -f 3)
+#define SND_UTIL_VERSION	((SND_UTIL_MAJOR<<16)|(SND_UTIL_MINOR<<8)|SND_UTIL_SUBMINOR)
+#define SND_UTIL_VERSION_STR	"$(cat version)"
+EOF
+
+enable_header() {
+  sed -i "s/\/\* #undef $1 \*\//#define $1 1/" include/aconfig.h
+}
+
+# Enable alsa headers that we have. Setting include path using --with-alsa-inc-prefix doesn't work when cross-compiling.
+enable_header HAVE_ALSA_MIXER_H
+enable_header HAVE_ALSA_PCM_H
+enable_header HAVE_ALSA_RAWMIDI_H
+enable_header HAVE_ALSA_SEQ_H
+enable_header HAVE_ALSA_TOPOLOGY_H
+enable_header HAVE_ALSA_USE_CASE_H
+
+exit 0
