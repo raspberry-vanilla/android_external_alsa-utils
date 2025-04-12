@@ -1,0 +1,140 @@
+//
+// Copyright (C) 2025 KonstaKANG
+//
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+
+cc_defaults {
+    name: "alsa-utils_defaults",
+    vendor: true,
+    local_include_dirs: [
+        "include",
+    ],
+    shared_libs: [
+        "libasound",
+    ],
+    cflags: [
+        "-O2",
+        "-DPIC",
+        "-fPIC",
+    ],
+}
+
+cc_binary {
+    name: "alsactl",
+    srcs: [
+        "alsactl/alsactl.c",
+        "alsactl/clean.c",
+        "alsactl/daemon.c",
+        "alsactl/info.c",
+        "alsactl/init_parse.c",
+        "alsactl/init_ucm.c",
+        "alsactl/lock.c",
+        "alsactl/monitor.c",
+        "alsactl/state.c",
+        "alsactl/utils.c",
+    ],
+    cflags: [
+        "-DSYS_ASOUNDRC=\"/data/local/tmp/asound.state\"",
+        "-DSYS_LOCKFILE=\"asound.state.lock\"",
+        "-DSYS_LOCKPATH=\"/data/local/tmp/\"",
+        "-DSYS_PIDFILE=\"/data/local/tmp/alsactl.pid\"",
+        "-D_GNU_SOURCE",
+        "-D__USE_GNU",
+        "-Wno-parentheses",
+    ],
+    defaults: ["alsa-utils_defaults"],
+}
+
+cc_binary {
+    name: "alsaloop",
+    srcs: [
+        "alsaloop/alsaloop.c",
+        "alsaloop/control.c",
+        "alsaloop/pcmjob.c",
+    ],
+    defaults: ["alsa-utils_defaults"],
+}
+
+cc_binary {
+    name: "alsaucm",
+    srcs: [
+        "alsaucm/dump.c",
+        "alsaucm/usecase.c",
+    ],
+    defaults: ["alsa-utils_defaults"],
+}
+
+cc_binary {
+    name: "alsamidi",
+    srcs: [
+        "amidi/amidi.c",
+    ],
+    defaults: ["alsa-utils_defaults"],
+}
+
+cc_binary {
+    name: "amixer",
+    srcs: [
+        "amixer/amixer.c",
+        "amixer/volume_mapping.c",
+    ],
+    cflags: [
+        "-D_GNU_SOURCE",
+    ],
+    defaults: ["alsa-utils_defaults"],
+}
+
+cc_binary {
+    name: "aplay",
+    srcs: [
+        "aplay/aplay.c",
+    ],
+    defaults: ["alsa-utils_defaults"],
+}
+
+cc_binary {
+    name: "arecord",
+    srcs: [
+        "aplay/aplay.c",
+    ],
+    defaults: ["alsa-utils_defaults"],
+}
+
+cc_binary {
+    name: "axfer",
+    srcs: [
+        "axfer/container-au.c",
+        "axfer/container-raw.c",
+        "axfer/container-riff-wave.c",
+        "axfer/container-voc.c",
+        "axfer/container.c",
+        "axfer/frame-cache.c",
+        "axfer/main.c",
+        "axfer/mapper-multiple.c",
+        "axfer/mapper-single.c",
+        "axfer/mapper.c",
+        "axfer/subcmd-list.c",
+        "axfer/subcmd-transfer.c",
+        "axfer/waiter-epoll.c",
+        "axfer/waiter-poll.c",
+        "axfer/waiter-select.c",
+        "axfer/waiter.c",
+        "axfer/xfer-libasound-irq-mmap.c",
+        "axfer/xfer-libasound-irq-rw.c",
+        "axfer/xfer-libasound-timer-mmap.c",
+        "axfer/xfer-libasound.c",
+        "axfer/xfer-options.c",
+        "axfer/xfer.c",
+    ],
+    defaults: ["alsa-utils_defaults"],
+}
+
+cc_binary {
+    name: "iecset",
+    srcs: [
+        "iecset/iecbits.c",
+        "iecset/iecset.c",
+    ],
+    defaults: ["alsa-utils_defaults"],
+}
