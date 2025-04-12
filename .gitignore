@@ -64,9 +64,8 @@ alsaucm/89-alsa-ucm.rules
 topology/alsatplg
 nhlt/nhlt-dmic-info
 
-include/aconfig.h*
+include/aconfig.h.in
 include/stamp-*
-include/version.h
 po/Makefile*
 po/POTFILES
 po/Rules-quot
