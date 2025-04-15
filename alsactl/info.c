@@ -35,7 +35,9 @@ static int pcm_device_list(snd_ctl_t *ctl, snd_pcm_stream_t stream, bool *first)
 	streamfirst = true;
 	while (1) {
 		if ((err = snd_ctl_pcm_next_device(ctl, &dev)) < 0) {
-			error("snd_ctl_pcm_next_device");
+			if (err == ENOTTY)	/* no kernel support */
+				return 0;
+			error("snd_ctl_pcm_next_device: %s", snd_strerror(err));
 			return err;
 		}
 		if (dev < 0)
@@ -102,7 +104,9 @@ static int rawmidi_device_list(snd_ctl_t *ctl, snd_rawmidi_stream_t stream, bool
 	streamfirst = true;
 	while (1) {
 		if ((err = snd_ctl_rawmidi_next_device(ctl, &dev)) < 0) {
-			error("snd_ctl_rawmidi_next_device");
+			if (err == ENOTTY)	/* no kernel support */
+				return 0;
+			error("snd_ctl_rawmidi_next_device: %s", snd_strerror(err));
 			return err;
 		}
 		if (dev < 0)
@@ -159,7 +163,9 @@ static int hwdep_device_list(snd_ctl_t *ctl)
 	first = true;
 	while (1) {
 		if ((err = snd_ctl_hwdep_next_device(ctl, &dev)) < 0) {
-			error("snd_ctl_pcm_next_device");
+			if (err == ENOTTY)	/* no kernel support */
+				return 0;
+			error("snd_ctl_pcm_next_device: %s", snd_strerror(err));
 			return err;
 		}
 		if (dev < 0)

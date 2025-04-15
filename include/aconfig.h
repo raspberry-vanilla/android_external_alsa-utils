@@ -141,7 +141,7 @@
 #define PACKAGE_NAME "alsa-utils"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "alsa-utils 1.2.13"
+#define PACKAGE_STRING "alsa-utils 1.2.14"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "alsa-utils"
@@ -150,7 +150,7 @@
 #define PACKAGE_URL ""
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "1.2.13"
+#define PACKAGE_VERSION "1.2.14"
 
 /* directory containing sample data */
 #define SOUNDSDIR "/vendor/usr/share/sounds/alsa"
@@ -165,7 +165,7 @@
 #define TIME_WITH_SYS_TIME 1
 
 /* ALSA util version */
-#define VERSION "1.2.13"
+#define VERSION "1.2.14"
 
 /* Define if FFADO library is available */
 /* #undef WITH_FFADO */
