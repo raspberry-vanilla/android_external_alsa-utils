@@ -1,6 +1,6 @@
 dnl Process this file with autoconf to produce a configure script.
 AC_PREREQ(2.59)
-AC_INIT(alsa-utils, 1.2.14)
+AC_INIT(alsa-utils, 1.2.15.1)
 AC_CONFIG_SRCDIR([aplay/aplay.c])
 AC_PREFIX_DEFAULT(/usr)
 AM_INIT_AUTOMAKE([subdir-objects])
@@ -419,8 +419,8 @@ AC_ARG_WITH([systemdsystemunitdir],
 if test "x$with_systemdsystemunitdir" != xno; then
         AC_SUBST([systemdsystemunitdir], [$with_systemdsystemunitdir])
 fi
-AM_CONDITIONAL(HAVE_SYSTEMD, [test "$have_min_systemd" = "yes" \
-        -a -n "$with_systemdsystemunitdir" -a "x$with_systemdsystemunitdir" != xno ])
+AM_CONDITIONAL(HAVE_SYSTEMD, [test -n "$with_systemdsystemunitdir" \
+			      -a "x$with_systemdsystemunitdir" != xno ])
 
 AC_ARG_WITH([asound-state-dir],
         AS_HELP_STRING([--with-asound-state-dir=DIR], [Directory to place asound.state file in]),

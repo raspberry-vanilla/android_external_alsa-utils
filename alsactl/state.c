@@ -29,6 +29,33 @@
 #include <errno.h>
 #include "alsactl.h"
 
+static int linked_cards[16];
+
+static void init_linked_cards(void)
+{
+	size_t index;
+
+	for (index = 0; index < ARRAY_SIZE(linked_cards); index++)
+		linked_cards[index] = -1;
+}
+
+void add_linked_card(int cardno)
+{
+	size_t index;
+
+	for (index = 0; index < ARRAY_SIZE(linked_cards); index++) {
+		if (linked_cards[index] == cardno)
+			return;
+	}
+
+	for (index = 0; index < ARRAY_SIZE(linked_cards); index++) {
+		if (linked_cards[index] < 0) {
+			linked_cards[index] = cardno;
+			return;
+		}
+	}
+	error("Too many linked cards!");
+}
 
 static char *id_str(snd_ctl_elem_id_t *id)
 {
@@ -1511,7 +1538,7 @@ static int set_controls(int card, snd_config_t *top, int doit)
 	snd_ctl_elem_id_t *elem_id;
 	snd_config_t *control;
 	snd_config_iterator_t i, next;
-	int err, controls1 = -1, controls2 = -1;
+	int err, controls1 = -1, controls2 = -1, ucontrols = -1, diff;
 	unsigned int idx, count = 0;
 	char name[32], tmpid[16];
 	const char *id;
@@ -1571,7 +1598,7 @@ static int set_controls(int card, snd_config_t *top, int doit)
 	count = snd_ctl_elem_list_get_count(list);
 	dbg("list count: %u", count);
 	if (count == 0)
-		goto _check;
+		goto _free;
 	snd_ctl_elem_list_set_offset(list, 0);
 	if (snd_ctl_elem_list_alloc_space(list, count) < 0) {
 		error("No enough memory...");
@@ -1581,13 +1608,15 @@ static int set_controls(int card, snd_config_t *top, int doit)
 		error("Cannot determine controls (2): %s", snd_strerror(err));
 		goto _free;
 	}
-	controls2 = 0;
-	/* skip non-readable elements */
+	controls2 = ucontrols = 0;
+	/* skip non-readable and count user elements */
 	for (idx = 0; idx < count; ++idx) {
 		snd_ctl_elem_info_clear(elem_info);
 		snd_ctl_elem_list_get_id(list, idx, elem_id);
 		snd_ctl_elem_info_set_id(elem_info, elem_id);
 		if (snd_ctl_elem_info(handle, elem_info) == 0) {
+			if (snd_ctl_elem_info_is_user(elem_info))
+				ucontrols++;
 			if (!snd_ctl_elem_info_is_readable(elem_info))
 				continue;
 			controls2++;
@@ -1596,9 +1625,9 @@ static int set_controls(int card, snd_config_t *top, int doit)
 
 	/* check if we have additional controls in driver */
 	/* in this case we should go through init procedure */
- _check:
-	dbg("controls1=%i controls2=%i", controls1, controls2);
-	if (controls1 >= 0 && controls1 != controls2) {
+	diff = controls2 - controls1;
+	dbg("controls1=%i controls2=%i ucontrols=%i diff=%i", controls1, controls2, ucontrols, diff);
+	if (controls1 >= 0 && (-diff > ucontrols || diff > ucontrols)) {
 		/* not very informative */
 		/* but value is used for check only */
 		err = -EAGAIN;
@@ -1701,10 +1730,11 @@ int load_state(const char *cfgdir, const char *file,
 	       const char *initfile, int initflags,
 	       const char *cardname, int do_init)
 {
-	int err, finalerr = 0, open_failed, lock_fd;
+	int err, finalerr = 0, open_failed, lock_fd, cardno;
 	struct snd_card_iterator iter;
 	snd_config_t *config;
 	const char *cardname1;
+	size_t index;
 
 	config = NULL;
 	err = load_configuration(file, &config, &open_failed);
@@ -1721,6 +1751,9 @@ int load_state(const char *cfgdir, const char *file,
 		while ((cardname1 = snd_card_iterator_next(&iter)) != NULL) {
 			if (!do_init)
 				break;
+			init_linked_cards();
+			if (initflags & FLAG_UCM_WAIT)
+				wait_for_card(-1, iter.card);
 			lock_fd = card_lock(iter.card, LOCK_TIMEOUT);
 			if (lock_fd < 0) {
 				finalerr = lock_fd;
@@ -1729,9 +1762,12 @@ int load_state(const char *cfgdir, const char *file,
 			}
 			err = init(cfgdir, initfile, initflags | FLAG_UCM_FBOOT | FLAG_UCM_BOOT, cardname1);
 			card_unlock(lock_fd, iter.card);
+			if (card_state_is_okay(err))
+				export_card_state_set(iter.card, err);
 			if (err < 0) {
 				finalerr = err;
 				initfailed(iter.card, "init", err);
+				continue;
 			}
 			initfailed(iter.card, "restore", -ENOENT);
 		}
@@ -1745,6 +1781,9 @@ int load_state(const char *cfgdir, const char *file,
 	if (err < 0)
 		goto out;
 	while ((cardname1 = snd_card_iterator_next(&iter)) != NULL) {
+		init_linked_cards();
+		if (initflags & FLAG_UCM_WAIT)
+			wait_for_card(-1, iter.card);
 		lock_fd = card_lock(iter.card, LOCK_TIMEOUT);
 		if (lock_fd < 0) {
 			initfailed(iter.card, "lock", lock_fd);
@@ -1752,7 +1791,12 @@ int load_state(const char *cfgdir, const char *file,
 			continue;
 		}
 		/* error is ignored */
-		init_ucm(initflags | FLAG_UCM_FBOOT, iter.card);
+		err = init_ucm(initflags | FLAG_UCM_FBOOT, iter.card);
+		/* return code 1 and 2 -> postpone initialization */
+		if (card_state_is_okay(err)) {
+			export_card_state_set(iter.card, err);
+			goto unlock_card;
+		}
 		/* do a check if controls matches state file */
 		if (do_init && set_controls(iter.card, config, 0)) {
 			err = init(cfgdir, initfile, initflags | FLAG_UCM_BOOT, cardname1);
@@ -1766,6 +1810,18 @@ int load_state(const char *cfgdir, const char *file,
 				finalerr = err;
 			initfailed(iter.card, "restore", err);
 		}
+		/* for linked cards, restore controls, too */
+		for (index = 0; index < ARRAY_SIZE(linked_cards); index++) {
+			if ((cardno = linked_cards[index]) < 0)
+				break;
+			dbg("Restore for linked card %d", cardno);
+			if ((err = set_controls(cardno, config, 1))) {
+				if (!force_restore)
+					finalerr = err;
+				initfailed(cardno, "restore", err);
+			}
+		}
+unlock_card:
 		card_unlock(lock_fd, iter.card);
 	}
 	err = finalerr ? finalerr : snd_card_iterator_error(&iter);

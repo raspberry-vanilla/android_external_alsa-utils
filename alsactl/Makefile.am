@@ -11,8 +11,9 @@ AM_CFLAGS = -D_GNU_SOURCE
 
 AM_CPPFLAGS = -I$(top_srcdir)/include
 
-alsactl_SOURCES=alsactl.c state.c lock.c utils.c init_parse.c init_ucm.c \
-		daemon.c monitor.c clean.c info.c
+alsactl_SOURCES=alsactl.c state.c lock.c utils.c wait.c \
+		init_parse.c init_ucm.c boot_params.c \
+		daemon.c monitor.c clean.c info.c export.c
 
 alsactl_CFLAGS=$(AM_CFLAGS) -D__USE_GNU \
                -DSYS_ASOUNDRC=\"$(ASOUND_STATE_DIR)/asound.state\" \
@@ -24,13 +25,14 @@ noinst_HEADERS=alsactl.h list.h init_sysdeps.c init_utils_string.c \
                init_utils_run.c init_sysfs.c
 
 udevrules_DATA = \
-	90-alsa-restore.rules
+	conf/90-alsa-restore.rules
 
 if HAVE_SYSTEMD
 
 systemdsystemunit_DATA = \
-	alsa-state.service \
-	alsa-restore.service
+	conf/alsa-state.service \
+	conf/alsa-restore.service \
+	conf/alsa-card-wait@.service
 
 install-data-hook:
 	$(MKDIR_P) -m 0755 \
@@ -45,6 +47,7 @@ endif
 edit = \
 	extratest=$$(echo ' $(ALSACTL_UDEV_EXTRATEST)' | sed -e 's/__/ /g' -e 's/^ $$//'); \
 	args=$$(echo ' $(ALSACTL_UDEV_ARGS)' | sed -e 's/__/ /g' -e 's/^ $$//'); \
+	mkdir -p conf; \
 	$(SED) -r -e 's,@sbindir\@,$(sbindir),g' \
 		  -e 's,@mydatadir\@,$(mydatadir),g' \
 		  -e 's,@daemonswitch\@,$(ALSACTL_DAEMONSWITCH),g' \
@@ -53,24 +56,29 @@ edit = \
 		  -e "s;@args\@;$${args};g" \
 							< $< > $@ || rm $@
 
-alsa-state.service: alsa-state.service.in
+conf/alsa-state.service: conf/alsa-state.service.in
 	$(edit)
 
-alsa-restore.service: alsa-restore.service.in
+conf/alsa-restore.service: conf/alsa-restore.service.in
 	$(edit)
 
-90-alsa-restore.rules: 90-alsa-restore.rules.in
+conf/alsa-card-wait@.service: conf/alsa-card-wait@.service.in
+	$(edit)
+
+conf/90-alsa-restore.rules: conf/90-alsa-restore.rules.in
 	$(edit)
 
 EXTRA_DIST += \
-	alsa-state.service.in \
-	alsa-restore.service.in \
-	90-alsa-restore.rules.in
+	conf/alsa-state.service.in \
+	conf/alsa-restore.service.in \
+	conf/alsa-card-wait@.service.in \
+	conf/90-alsa-restore.rules.in
 
 CLEANFILES = \
-	alsa-state.service \
-	alsa-restore.service \
-	90-alsa-restore.rules
+	conf/alsa-state.service \
+	conf/alsa-restore.service \
+	conf/alsa-card-wait@.service \
+	conf/90-alsa-restore.rules
 
 %.7: %.xml
 	xmlto man $?

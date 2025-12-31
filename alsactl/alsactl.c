@@ -44,14 +44,19 @@
 #ifndef SYS_LOCKPATH
 #define SYS_LOCKPATH "/var/lock"
 #endif
+#ifndef SYS_CARD_GROUP
+#define SYS_CARD_GROUP SYS_ASOUND_DIR "/card-group.state"
+#endif
 
 int debugflag = 0;
 int force_restore = 1;
 int ignore_nocards = 0;
 int do_lock = 0;
 int use_syslog = 0;
+int do_export = 0;
 char *command;
 char *statefile = NULL;
+char *groupfile = SYS_CARD_GROUP;
 char *lockpath = SYS_LOCKPATH;
 char *lockfile = SYS_LOCKFILE;
 
@@ -78,6 +83,7 @@ static struct arg args[] = {
 { 'v', "version", "print version of this program" },
 { HEADER, NULL, "Available state options:" },
 { FILEARG | 'f', "file", "configuration file (default " SYS_ASOUNDRC ")" },
+{ FILEARG | 'G', "group-file", "card group configuration file (default " SYS_CARD_GROUP ")" },
 { FILEARG | 'a', "config-dir", "boot / hotplug configuration directory (default " SYS_ASOUND_DIR ")" },
 { 'l', "lock", "use file locking to serialize concurrent access" },
 { 'L', "no-lock", "do not use file locking to serialize concurrent access" },
@@ -92,6 +98,7 @@ static struct arg args[] = {
 { FILEARG | 'r', "runstate", "save restore and init state to this file (only errors)" },
 { 0, NULL, "  default settings is 'no file set'" },
 { 'R', "remove", "remove runstate file at first, otherwise append errors" },
+{ 'Y', "export", "export card state as key=value pairs (restore command only)" },
 { INTARG | 'p', "period", "store period in seconds for the daemon command" },
 { FILEARG | 'e', "pid-file", "pathname for the process id (daemon mode)" },
 { HEADER, NULL, "Available init options:" },
@@ -105,6 +112,7 @@ static struct arg args[] = {
 #ifdef HAVE_ALSA_USE_CASE_H
 { 'D', "ucm-defaults", "execute also the UCM 'defaults' section" },
 { 'U', "no-ucm", "don't init with UCM" },
+{ 'm', "force-ucm-restore", "force UCM restore for boot card groups" },
 #if SND_LIB_VER(1, 2, 5) < SND_LIB_VERSION
 { 'X', "ucm-nodev", "show UCM no device errors" },
 #endif
@@ -115,6 +123,7 @@ static struct arg args[] = {
 { CARDCMD, "restore", "load current driver setup for one or each soundcards" },
 { EMPCMD, NULL, "  from configuration file" },
 { CARDCMD, "nrestore", "like restore, but notify the daemon to rescan soundcards" },
+{ CARDCMD, "wrestore", "wait for card ready, then restore" },
 { CARDCMD, "init", "initialize driver to a default state" },
 { CARDCMD, "daemon", "store state periodically for one or each soundcards" },
 { CARDCMD, "rdaemon", "like daemon but do the state restore at first" },
@@ -301,6 +310,9 @@ int main(int argc, char *argv[])
 		case 'f':
 			cfgfile = optarg;
 			break;
+		case 'G':
+			groupfile = optarg;
+			break;
 		case 'a':
 			cfgdir = optarg;
 			break;
@@ -341,6 +353,9 @@ int main(int argc, char *argv[])
 		case 'U':
 			initflags |= FLAG_UCM_DISABLED;
 			break;
+		case 'm':
+			initflags |= FLAG_UCM_RESTORE;
+			break;
 		case 'X':
 			initflags |= FLAG_UCM_NODEV;
 			break;
@@ -349,6 +364,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'R':
 			removestate = 1;
+			break;
+		case 'Y':
+			do_export = 1;
 			break;
 		case 'P':
 			force_restore = 0;
@@ -441,7 +459,11 @@ int main(int argc, char *argv[])
 			syslog(LOG_INFO, "alsactl " SND_UTIL_VERSION_STR " daemon started");
 	}
 
+#if SND_LIB_VER(1, 2, 15) < SND_LIB_VERSION
 	snd_lib_error_set_handler(error_handler);
+#else
+	snd_lib_log_set_handler(log_handler);
+#endif
 
 	if (!strcmp(cmd, "init")) {
 		res = init(cfgdir, initfile, initflags | FLAG_UCM_FBOOT | FLAG_UCM_BOOT, cardname);
@@ -450,10 +472,15 @@ int main(int argc, char *argv[])
 		res = save_state(cfgfile, cardname);
 	} else if (!strcmp(cmd, "restore") ||
                    !strcmp(cmd, "rdaemon") ||
-		   !strcmp(cmd, "nrestore")) {
+		   !strcmp(cmd, "nrestore") ||
+		   !strcmp(cmd, "wrestore")) {
 		if (removestate)
 			remove(statefile);
+		if (!strcmp(cmd, "wrestore"))
+			initflags |= FLAG_UCM_WAIT;
 		res = load_state(cfgdir, cfgfile, initfile, initflags, cardname, init_fallback);
+		if (do_export && res >= 0)
+			res = export_cards(cardname);
 		if (!strcmp(cmd, "rdaemon")) {
 			do_nice(use_nice, sched_idle);
 			res = state_daemon(cfgfile, cardname, period, pidfile);

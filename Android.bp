@@ -24,8 +24,10 @@ cc_binary {
     name: "alsactl",
     srcs: [
         "alsactl/alsactl.c",
+        "alsactl/boot_params.c",
         "alsactl/clean.c",
         "alsactl/daemon.c",
+        "alsactl/export.c",
         "alsactl/info.c",
         "alsactl/init_parse.c",
         "alsactl/init_ucm.c",
@@ -33,6 +35,7 @@ cc_binary {
         "alsactl/monitor.c",
         "alsactl/state.c",
         "alsactl/utils.c",
+        "alsactl/wait.c",
     ],
     cflags: [
         "-DSYS_ASOUNDRC=\"/data/local/tmp/asound.state\"",
