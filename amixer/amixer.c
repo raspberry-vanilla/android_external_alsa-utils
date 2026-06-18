@@ -71,6 +71,7 @@ static int help(void)
 	printf("  -i,--inactive   show also inactive controls\n");
 	printf("  -a,--abstract L select abstraction level (none or basic)\n");
 	printf("  -s,--stdin      Read and execute commands from stdin sequentially\n");
+	printf("  -f,--file FILE  Read and execute commands from file sequentially\n");
 	printf("  -R,--raw-volume Use the raw value (default)\n");
 	printf("  -M,--mapped-volume Use the mapped volume\n");
 	printf("\nAvailable commands:\n");
@@ -1595,6 +1596,8 @@ static int events(int argc ATTRIBUTE_UNUSED, char *argv[] ATTRIBUTE_UNUSED)
 	snd_hctl_elem_t *helem;
 	int err;
 
+	setlinebuf(stdout);
+
 	if ((err = snd_hctl_open(&handle, card, 0)) < 0) {
 		error("Control %s open error: %s\n", card, snd_strerror(err));
 		return err;
@@ -1673,6 +1676,8 @@ static int sevents(int argc ATTRIBUTE_UNUSED, char *argv[] ATTRIBUTE_UNUSED)
 {
 	snd_mixer_t *handle;
 	int err;
+
+	setlinebuf(stdout);
 
 	if ((err = snd_mixer_open(&handle, 0)) < 0) {
 		error("Mixer %s open error: %s", card, snd_strerror(err));
@@ -1757,16 +1762,17 @@ static int split_line(char *buf, char **token, int max_token)
 
 #define MAX_ARGS	32
 
-static int exec_stdin(void)
+static int exec_file(FILE *file)
 {
 	int narg;
-	char buf[256], *args[MAX_ARGS];
+	char *buf = NULL, *args[MAX_ARGS];
+	size_t size = 0;
 	int err = 0;
 
 	/* quiet = 1; */
 	ignore_error = 1;
 
-	while (fgets(buf, sizeof(buf), stdin)) {
+	while (getline(&buf, &size, file) > 0) {
 		narg = split_line(buf, args, MAX_ARGS);
 		if (narg > 0) {
 			if (!strcmp(args[0], "sset") || !strcmp(args[0], "set"))
@@ -1774,10 +1780,12 @@ static int exec_stdin(void)
 			else if (!strcmp(args[0], "cset"))
 				err = cset(narg - 1, args + 1, 0, 1);
 			if (err < 0)
-				return 1;
+				break;
 		}
 	}
-	return 0;
+
+	free(buf);
+	return err < 0 ? 1 : 0;
 }
 
 
@@ -1785,6 +1793,8 @@ int main(int argc, char *argv[])
 {
 	int badopt, retval, level = 0;
 	int read_stdin = 0;
+	int read_file = 0;
+	char filename[256] = { 0 };
 	static const struct option long_option[] =
 	{
 		{"help", 0, NULL, 'h'},
@@ -1797,6 +1807,7 @@ int main(int argc, char *argv[])
 		{"version", 0, NULL, 'v'},
 		{"abstract", 1, NULL, 'a'},
 		{"stdin", 0, NULL, 's'},
+		{"file", 1, NULL, 'f'},
 		{"raw-volume", 0, NULL, 'R'},
 		{"mapped-volume", 0, NULL, 'M'},
 		{NULL, 0, NULL, 0},
@@ -1806,7 +1817,7 @@ int main(int argc, char *argv[])
 	while (1) {
 		int c;
 
-		if ((c = getopt_long(argc, argv, "hc:D:qidnva:sRM", long_option, NULL)) < 0)
+		if ((c = getopt_long(argc, argv, "hc:D:qidnva:sf:RM", long_option, NULL)) < 0)
 			break;
 		switch (c) {
 		case 'h':
@@ -1863,6 +1874,11 @@ int main(int argc, char *argv[])
 		case 's':
 			read_stdin = 1;
 			break;
+		case 'f':
+			read_file = 1;
+			strncpy(filename, optarg, sizeof(filename)-1);
+			filename[sizeof(filename)-1] = '\0';
+			break;
 		case 'R':
 			std_vol_type = VOL_RAW;
 			break;
@@ -1880,7 +1896,21 @@ int main(int argc, char *argv[])
 	smixer_options.device = card;
 
 	if (read_stdin) {
-		retval = exec_stdin();
+		retval = exec_file(stdin);
+		goto finish;
+	}
+
+	if (read_file) {
+		FILE *file;
+		file = fopen(filename, "r");
+		if (!file) {
+			retval = errno;
+			perror("fopen");
+			goto finish;
+		}
+
+		retval = exec_file(file);
+		fclose(file);
 		goto finish;
 	}
 

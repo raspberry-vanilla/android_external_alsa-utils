@@ -283,7 +283,7 @@ static void device_list(void)
 	       snd_pcm_stream_name(stream));
 	while (card >= 0) {
 		char name[32];
-		sprintf(name, "hw:%d", card);
+		snprintf(name, sizeof(name), "hw:%d", card);
 		if ((err = snd_ctl_open(&handle, name, 0)) < 0) {
 			error("control open (%i): %s", card, snd_strerror(err));
 			goto next_card;
@@ -3219,7 +3219,7 @@ static int new_capture_file(char *name, char *namebuf, size_t namelen,
  */
 int create_path(const char *path)
 {
-	char *start;
+	const char *start;
 	mode_t mode = S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;
 
 	if (path[0] == '/')

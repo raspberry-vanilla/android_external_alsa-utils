@@ -14,8 +14,8 @@ cc_defaults {
         "libasound",
     ],
     cflags: [
-        "-O2",
         "-DPIC",
+        "-O2",
         "-fPIC",
     ],
 }
